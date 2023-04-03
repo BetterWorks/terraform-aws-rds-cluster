@@ -19,7 +19,7 @@
 #
 
 module "this" {
-  source     = "git::https://github.com/betterworks/terraform-null-label.git?ref=tf-upgrade"
+  source = "git::https://github.com/cloudposse/terraform-null-label.git?ref=tags/0.20.0"
 
   enabled             = var.enabled
   namespace           = var.namespace
