@@ -130,6 +130,12 @@ variable "engine_version" {
   description = "The version of the database engine to use. See `aws rds describe-db-engine-versions` "
 }
 
+variable "allow_major_version_upgrade" {
+  type        = bool
+  default     = false
+  description = "Enable to allow major engine version upgrades when changing engine versions. Defaults to false."
+}
+
 variable "auto_minor_version_upgrade" {
   type        = bool
   default     = true
@@ -340,6 +346,21 @@ variable "reader_dns_name" {
   type        = string
   description = "Name of the reader endpoint CNAME record to create in the parent DNS zone specified by `zone_id`. If left empty, the name will be auto-asigned using the format `replicas.var.name`"
   default     = ""
+}
+
+variable "cluster_type" {
+  type        = string
+  description = <<-EOT
+    Either `regional` or `global`.
+    If `regional` will be created as a normal, standalone DB.
+    If `global`, will be made part of a Global cluster (requires `global_cluster_identifier`).
+    EOT
+  default     = "regional"
+
+  validation {
+    condition     = contains(["regional", "global"], var.cluster_type)
+    error_message = "Allowed values: `regional` (standalone), `global` (part of global cluster)."
+  }
 }
 
 variable "global_cluster_identifier" {

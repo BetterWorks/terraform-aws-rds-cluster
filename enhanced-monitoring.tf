@@ -5,7 +5,7 @@ module "enhanced_monitoring_label" {
   source = "git::https://github.com/betterworks/terraform-null-label.git?ref=tags/0.13.0"
 
   enabled    = module.this.enabled && var.enhanced_monitoring_role_enabled
-  attributes = concat(module.this.attributes, ["enhanced-monitoring"])
+  attributes = ["enhanced-monitoring"]
 
   context = module.this.context
 }
@@ -15,6 +15,7 @@ resource "aws_iam_role" "enhanced_monitoring" {
   count              = module.this.enabled && var.enhanced_monitoring_role_enabled ? 1 : 0
   name               = module.enhanced_monitoring_label.id
   assume_role_policy = join("", data.aws_iam_policy_document.enhanced_monitoring.*.json)
+  tags               = module.enhanced_monitoring_label.tags
 }
 
 # Attach Amazon's managed policy for RDS enhanced monitoring

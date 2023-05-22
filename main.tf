@@ -1,6 +1,6 @@
 locals {
   cluster_instance_count = module.this.enabled ? var.cluster_size : 0
-  is_primary_cluster     = var.global_cluster_identifier == null || var.global_cluster_identifier == "" ? true : false
+  is_regional_cluster    = var.cluster_type == "regional"
 }
 
 resource "aws_security_group" "default" {
@@ -44,8 +44,10 @@ resource "aws_security_group_rule" "egress" {
   security_group_id = join("", aws_security_group.default.*.id)
 }
 
+# The name "primary" is poorly chosen. We actually mean standalone or regional.
+# The primary cluster of a global database is actually created with the "secondary" cluster resource below.
 resource "aws_rds_cluster" "primary" {
-  count                               = module.this.enabled && local.is_primary_cluster == true ? 1 : 0
+  count                               = module.this.enabled && local.is_regional_cluster ? 1 : 0
   cluster_identifier                  = var.cluster_identifier == "" ? module.this.id : var.cluster_identifier
   database_name                       = var.db_name
   master_username                     = var.admin_user
@@ -68,10 +70,17 @@ resource "aws_rds_cluster" "primary" {
   tags                                = module.this.tags
   engine                              = var.engine
   engine_version                      = var.engine_version
+  allow_major_version_upgrade         = var.allow_major_version_upgrade
   engine_mode                         = var.engine_mode
   iam_roles                           = var.iam_roles
   backtrack_window                    = var.backtrack_window
   enable_http_endpoint                = var.engine_mode == "serverless" && var.enable_http_endpoint ? true : false
+
+  depends_on = [
+    aws_db_subnet_group.default,
+    aws_rds_cluster_parameter_group.default,
+    aws_security_group.default,
+  ]
 
   dynamic "s3_import" {
     for_each = var.s3_import[*]
@@ -120,7 +129,7 @@ resource "aws_rds_cluster" "primary" {
 
 # https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/rds_cluster#replication_source_identifier
 resource "aws_rds_cluster" "secondary" {
-  count                               = module.this.enabled && local.is_primary_cluster == false ? 1 : 0
+  count                               = module.this.enabled && ! local.is_regional_cluster ? 1 : 0
   cluster_identifier                  = var.cluster_identifier == "" ? module.this.id : var.cluster_identifier
   database_name                       = var.db_name
   master_username                     = var.admin_user
@@ -143,10 +152,18 @@ resource "aws_rds_cluster" "secondary" {
   tags                                = module.this.tags
   engine                              = var.engine
   engine_version                      = var.engine_version
+  allow_major_version_upgrade         = var.allow_major_version_upgrade
   engine_mode                         = var.engine_mode
   iam_roles                           = var.iam_roles
   backtrack_window                    = var.backtrack_window
   enable_http_endpoint                = var.engine_mode == "serverless" && var.enable_http_endpoint ? true : false
+
+  depends_on = [
+    aws_db_subnet_group.default,
+    aws_db_parameter_group.default,
+    aws_rds_cluster_parameter_group.default,
+    aws_security_group.default,
+  ]
 
   dynamic "scaling_configuration" {
     for_each = var.scaling_configuration
@@ -180,7 +197,8 @@ resource "aws_rds_cluster" "secondary" {
 
   lifecycle {
     ignore_changes = [
-      replication_source_identifier
+      replication_source_identifier, # will be set/managed by Global Cluster
+      snapshot_identifier,           # if created from a snapshot, will be non-null at creation, but null afterwards
     ]
   }
 }
@@ -202,6 +220,14 @@ resource "aws_rds_cluster_instance" "default" {
   performance_insights_enabled    = var.performance_insights_enabled
   performance_insights_kms_key_id = var.performance_insights_kms_key_id
   availability_zone               = var.instance_availability_zone
+
+  depends_on = [
+    aws_db_subnet_group.default,
+    aws_db_parameter_group.default,
+    aws_iam_role.enhanced_monitoring,
+    aws_rds_cluster.secondary,
+    aws_rds_cluster_parameter_group.default,
+  ]
 }
 
 resource "aws_db_subnet_group" "default" {
@@ -214,7 +240,7 @@ resource "aws_db_subnet_group" "default" {
 
 resource "aws_rds_cluster_parameter_group" "default" {
   count       = module.this.enabled ? 1 : 0
-  name        = module.this.id
+  name_prefix = "${module.this.id}${module.this.delimiter}"
   description = "DB cluster parameter group"
   family      = var.cluster_family
 
@@ -228,11 +254,15 @@ resource "aws_rds_cluster_parameter_group" "default" {
   }
 
   tags = module.this.tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_db_parameter_group" "default" {
   count       = module.this.enabled ? 1 : 0
-  name        = module.this.id
+  name_prefix = "${module.this.id}${module.this.delimiter}"
   description = "DB instance parameter group"
   family      = var.cluster_family
 
@@ -246,6 +276,10 @@ resource "aws_db_parameter_group" "default" {
   }
 
   tags = module.this.tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 locals {
