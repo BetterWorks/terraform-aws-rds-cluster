@@ -19,7 +19,7 @@
 #
 
 module "this" {
-  source = "git::https://github.com/cloudposse/terraform-null-label.git?ref=tags/0.20.0"
+  source              = "git::https://github.com/cloudposse/terraform-null-label.git?ref=tags/0.20.0"
   enabled             = var.enabled
   namespace           = var.namespace
   environment         = var.environment
@@ -32,8 +32,6 @@ module "this" {
   label_order         = var.label_order
   regex_replace_chars = var.regex_replace_chars
   id_length_limit     = var.id_length_limit
-  label_key_case      = var.label_key_case
-  label_value_case    = var.label_value_case
 
   context = var.context
 }
@@ -55,8 +53,6 @@ variable "context" {
     regex_replace_chars = null
     label_order         = []
     id_length_limit     = null
-    label_key_case      = null
-    label_value_case    = null
   }
   description = <<-EOT
     Single object for setting entire context at once.
