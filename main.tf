@@ -242,7 +242,7 @@ resource "aws_rds_cluster_parameter_group" "default" {
   count       = module.this.enabled ? 1 : 0
 
   #name_prefix = "${module.this.id}${module.this.delimiter}"
-  name        = module.this.id
+  name        = "${module.this.id}-${var.cluster_family}"
 
   description = "DB cluster parameter group"
   family      = var.cluster_family
@@ -267,7 +267,7 @@ resource "aws_db_parameter_group" "default" {
   count       = module.this.enabled ? 1 : 0
   
   #name_prefix = "${module.this.id}${module.this.delimiter}"
-  name        = module.this.id
+  name        = "${module.this.id}-${var.cluster_family}"
   
   description = "DB instance parameter group"
   family      = var.cluster_family
