@@ -204,6 +204,12 @@ variable "storage_encrypted" {
   default     = false
 }
 
+variable "storage_type" {
+  type        = string
+  description = "Aurora storage type: `aurora` (Standard) or `aurora-iopt1` (I/O-Optimized). `null` leaves it unmanaged"
+  default     = null
+}
+
 variable "kms_key_arn" {
   type        = string
   description = "The ARN for the KMS encryption key. When specifying `kms_key_arn`, `storage_encrypted` needs to be set to `true`"
